@@ -26,29 +26,26 @@ if($_SERVER['REQUEST_METHOD'] === "POST"){
 		exit();
 	}
 
-	$result = $auth->checkUser($email);
+	[$message,$result] = $auth->checkUser($email);
 
-	if($result === "USER_EXIST"){
+	if($message === "USER_EXIST"){
 		$_SESSION['signup_error'] = "User already exist! Try to login";
 		header("Location: signup.php");
 		exit();
 	}
-	else if($result === "SQL_ERROR"){
+	else if($message === "SQL_ERROR"){
 		$_SESSION['signup_error'] = "Internal Server Error!";
 		header("Location: signup.php");
 		exit();
 	}
 
-
-	// logic for otp verification
-	$otp = rand(100000, 999999);
     $_SESSION['signup_temp'] = [
         'name' => $name,
         'email' => $email,
         'pass' => $pass
     ];
 
-    $result = $auth->sendOtp($name,$email);
+    $result = $auth->sendOtp($email,$name);
 
     if($result){
     	header("Location: enter_otp.php");

@@ -10,7 +10,47 @@ class Auth {
 		$this->conn = $conn;
 	}
 
-	public function sendOtp($name,$email){
+	public function sendPayConfirmation($email,$name){
+		require_once __DIR__ . '/../vendor/autoload.php';
+		$config = require('./config/secret_config.php');
+
+		$mail = new PHPMailer(true);
+
+	    try {
+	        // Server settings
+	        $mail->isSMTP();
+	        $mail->Host = $config['SMTP_HOST'];
+	        $mail->SMTPAuth = true;
+	        $mail->Username = $config['SMTP_USERNAME'];
+	        $mail->Password = $config['SMTP_PASSWORD'];
+	        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+	        $mail->Port = 25;
+
+	        // From address
+	        $mail->setFrom('john.doe@example.org', 'John Doe');
+	        $mail->addAddress($email, $name);
+
+	        // Email content
+	        $mail->isHTML(true);
+
+	        $mail->Subject = 'Payment Confirmation - Task Tracker App';
+			$mail->Body    = "<p>Hello <strong>$name</strong>,</p>
+			                  <p>Thank you for your payment! 🎉</p>
+			                  <p>We have successfully received your payment and your access to the Task Tracker features is now active.</p>
+			                  <p>If you have any questions or need assistance, feel free to reach out.</p>
+			                  <br/>
+			                  <p>Happy productivity!<br/>- Task Tracker Team</p>";
+
+
+	        $mail->send();
+	        return true;
+	    } catch (Exception $e) {
+	        error_log("Mailer Error: {$mail->ErrorInfo}");
+	        return false;
+	    }
+	}
+
+	public function sendOtp($email,$name,$login=false){
 		// session_start();
 		require_once __DIR__ . '/../vendor/autoload.php';
 		$config = require('./config/secret_config.php');
@@ -36,12 +76,22 @@ class Auth {
 
 	        // Email content
 	        $mail->isHTML(true);
+
 	        $mail->Subject = 'Your OTP for Email Verification';
 	        $mail->Body    = "<p>Hello <strong>$name</strong>,</p>
 	                          <p>Your OTP for email verification is:</p>
 	                          <h2 style='color: #007bff;'>$otp</h2>
 	                          <p>This OTP is valid for 5 minutes. Please do not share it with anyone.</p>
 	                          <br/><p>- Task Tracker Team</p>";
+
+	        if($login){
+	        	$mail->Subject = 'Your OTP for Login';
+	        	$mail->Body    = "<p>Hello <strong>$name</strong>,</p>
+	                          	  <p>Your OTP for login is:</p>
+	                          	  <h2 style='color: #007bff;'>$otp</h2>
+	                          	  <p>This OTP is valid for 5 minutes. Please do not share it with anyone.</p>
+	                          	  <br/><p>- Task Tracker Team</p>";
+	        }
 
 	        $mail->send();
 	        return true;
@@ -53,20 +103,20 @@ class Auth {
 
 	public function checkUser($email){
 		try {
-			$stmt = $this->conn->prepare("SELECT id FROM users WHERE email = ?;");
+			$stmt = $this->conn->prepare("SELECT name FROM users WHERE email = ?;");
 			$stmt->bind_param("s",$email);
 			$stmt->execute();
-			$stmt->store_result();
+			$result = $stmt->get_result();
 			
-			if($stmt->num_rows > 0){
-				return "USER_EXIST";
+			if($result->num_rows > 0){
+				return ["USER_EXIST",$result];
 			}
 			else{
-				return "SUCCESS";
+				return ["USER_NOT_EXIST",""];
 			}
 		}
 		catch(mysqli_sql_exception $e) {
-			return "SQL_ERROR";
+			return ["SQL_ERROR",""];
 		}
 	}
 	

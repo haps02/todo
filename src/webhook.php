@@ -6,6 +6,7 @@ use Razorpay\Api\Api;
 use Razorpay\Api\Errors\SignatureVerificationError;
 
 require_once './classes/Database.php';
+require_once './classes/Auth.php';
 
 $webhookSecret = $config['WEBHOOK_SECRET']; // Replace with your actual webhook secret from Razorpay
 
@@ -43,13 +44,21 @@ try {
         $conn->report_mode = MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT;
 
         // Check if order exists
-        $stmt = $conn->prepare("SELECT user_id FROM orders WHERE razorpay_order_id = ?");
+        $stmt = $conn->prepare("SELECT * FROM orders WHERE razorpay_order_id = ?");
         $stmt->bind_param("s", $orderId);
         $stmt->execute();
         $result = $stmt->get_result()->fetch_assoc();
 
         if ($result) {
             $userId = $result['user_id'];
+
+            // Get the user info
+            $stmt = $conn->prepare("SELECT * FROM users WHERE id=?;");
+            $stmt->bind_param("i",$userId);
+            $stmt->execute();
+            $result = $stmt->get_result()->fetch_assoc();
+            $email = $result['email'];
+            $name = $result['name'];
 
             // Update orders table with payment ID
             $stmt = $conn->prepare("UPDATE orders SET razorpay_payment_id=?, status='paid' WHERE razorpay_order_id=?");
@@ -60,6 +69,15 @@ try {
             $stmt = $conn->prepare("UPDATE users SET is_paid = 1 WHERE id = ?");
             $stmt->bind_param("i", $userId);
             $stmt->execute();
+
+            // Send Payment confirmation via email
+            $auth = new Auth($conn);
+            $result = $auth->sendPayConfirmation($email,$name);
+
+            if($result)
+                file_put_contents("webhook_log.txt", "Sent payment confirmation email to $email.\n", FILE_APPEND);
+            else
+                file_put_contents("webhook_log.txt", "Error sending payment confirmation email to $email.\n", FILE_APPEND);
 
             file_put_contents("webhook_log.txt", "Updated user $userId as paid.\n", FILE_APPEND);
         } else {
