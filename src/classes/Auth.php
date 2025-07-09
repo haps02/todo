@@ -1,7 +1,6 @@
 <?php
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
+use Mailgun\Mailgun;
 
 class Auth {
 	private $conn;
@@ -14,38 +13,27 @@ class Auth {
 		require_once __DIR__ . '/../vendor/autoload.php';
 		$config = require('./config/secret_config.php');
 
-		$mail = new PHPMailer(true);
+		$apiKey = $config['MAILGUN_API_KEY'];
+	    $domain = $config['MAILGUN_DOMAIN'];
 
 	    try {
-	        // Server settings
-	        $mail->isSMTP();
-	        $mail->Host = $config['SMTP_HOST'];
-	        $mail->SMTPAuth = true;
-	        $mail->Username = $config['SMTP_USERNAME'];
-	        $mail->Password = $config['SMTP_PASSWORD'];
-	        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-	        $mail->Port = 25;
+	        $mg = Mailgun::create($apiKey);
 
-	        // From address
-	        $mail->setFrom('john.doe@example.org', 'John Doe');
-	        $mail->addAddress($email, $name);
+	        $response = $mg->messages()->send($domain, [
+	            'from'    => 'Task Tracker <no-reply@' . $domain . '>',
+	            'to'      => "$name <$email>",
+	            'subject' => 'Payment Confirmation - Task Tracker App',
+	            'html'    => "<p>Hello <strong>$name</strong>,</p>
+	                          <p>Thank you for your payment!</p>
+	                          <p>We have successfully received your payment and your access to the Task Tracker features is now active.</p>
+	                          <p>If you have any questions or need assistance, feel free to reach out.</p>
+	                          <br/>
+	                          <p>Happy productivity!<br/>- Task Tracker Team</p>"
+	        ]);
 
-	        // Email content
-	        $mail->isHTML(true);
-
-	        $mail->Subject = 'Payment Confirmation - Task Tracker App';
-			$mail->Body    = "<p>Hello <strong>$name</strong>,</p>
-			                  <p>Thank you for your payment! 🎉</p>
-			                  <p>We have successfully received your payment and your access to the Task Tracker features is now active.</p>
-			                  <p>If you have any questions or need assistance, feel free to reach out.</p>
-			                  <br/>
-			                  <p>Happy productivity!<br/>- Task Tracker Team</p>";
-
-
-	        $mail->send();
 	        return true;
-	    } catch (Exception $e) {
-	        error_log("Mailer Error: {$mail->ErrorInfo}");
+	    } catch (\Exception $e) {
+	        error_log("Mailgun Error: " . $e->getMessage());
 	        return false;
 	    }
 	}
@@ -58,45 +46,29 @@ class Auth {
 	    $otp = random_int(100000, 999999); // Generate 6-digit OTP
 	    $_SESSION['otp'] = $otp;
 
-		$mail = new PHPMailer(true);
+	    $apiKey = $config['MAILGUN_API_KEY'];
+	    $domain = $config['MAILGUN_DOMAIN'];
+
+	    $subject = $login ? 'Your OTP for Login' : 'Your OTP for Email Verification';
+	    $body = "<p>Hello <strong>$name</strong>,</p>
+	             <p>Your OTP for " . ($login ? "login" : "email verification") . " is:</p>
+	             <h2 style='color: #007bff;'>$otp</h2>
+	             <p>This OTP is valid for 5 minutes. Please do not share it with anyone.</p>
+	             <br/><p>- Task Tracker Team</p>";
 
 	    try {
-	        // Server settings
-	        $mail->isSMTP();
-	        $mail->Host = $config['SMTP_HOST'];
-	        $mail->SMTPAuth = true;
-	        $mail->Username = $config['SMTP_USERNAME'];
-	        $mail->Password = $config['SMTP_PASSWORD'];
-	        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-	        $mail->Port = 25;
+	        $mg = Mailgun::create($apiKey);
 
-	        // From address
-	        $mail->setFrom('john.doe@example.org', 'John Doe');
-	        $mail->addAddress($email, $name);
+	        $mg->messages()->send($domain, [
+	            'from'    => 'Task Tracker <no-reply@' . $domain . '>',
+	            'to'      => "$name <$email>",
+	            'subject' => $subject,
+	            'html'    => $body
+	        ]);
 
-	        // Email content
-	        $mail->isHTML(true);
-
-	        $mail->Subject = 'Your OTP for Email Verification';
-	        $mail->Body    = "<p>Hello <strong>$name</strong>,</p>
-	                          <p>Your OTP for email verification is:</p>
-	                          <h2 style='color: #007bff;'>$otp</h2>
-	                          <p>This OTP is valid for 5 minutes. Please do not share it with anyone.</p>
-	                          <br/><p>- Task Tracker Team</p>";
-
-	        if($login){
-	        	$mail->Subject = 'Your OTP for Login';
-	        	$mail->Body    = "<p>Hello <strong>$name</strong>,</p>
-	                          	  <p>Your OTP for login is:</p>
-	                          	  <h2 style='color: #007bff;'>$otp</h2>
-	                          	  <p>This OTP is valid for 5 minutes. Please do not share it with anyone.</p>
-	                          	  <br/><p>- Task Tracker Team</p>";
-	        }
-
-	        $mail->send();
 	        return true;
-	    } catch (Exception $e) {
-	        error_log("Mailer Error: {$mail->ErrorInfo}");
+	    } catch (\Exception $e) {
+	        error_log("Mailgun Error: " . $e->getMessage());
 	        return false;
 	    }
 	}
